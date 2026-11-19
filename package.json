@@ -1,0 +1,24 @@
+{
+  "name": "coy-discover-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Coy SDE Intern Assignment — Discover Tab & Mutual Matching",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "seed": "cd backend && npm run seed",
+    "test": "cd backend && npm test",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "coy",
+    "dating-app",
+    "discover",
+    "mutual-matching",
+    "nextjs",
+    "express",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,39 @@
+{
+  "name": "coy-discover-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Coy Discover Tab SDE Intern Assignment",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "seed": "node src/seed/seed.js",
+    "test": "node ./node_modules/jest/bin/jest.js --runInBand --detectOpenHandles"
+  },
+  "keywords": [
+    "coy",
+    "dating-app",
+    "discover",
+    "swiping",
+    "express",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.4.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^9.2.0",
+    "nodemon": "^3.1.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000
+  }
+}
