@@ -4,111 +4,67 @@ const Profile = require('../models/Profile');
 const Swipe = require('../models/Swipe');
 const Match = require('../models/Match');
 
-const DEMO_USERNAME = 'demo_user';
-
-/**
- * Get the seeded demo user record.
- */
 async function getDemoUser() {
-  let user = await User.findOne({ username: DEMO_USERNAME });
+  let user = await User.findOne({ username: 'demo_user' });
   if (!user) {
     user = await User.create({
-      username: DEMO_USERNAME,
+      username: 'demo_user',
       name: 'Alex Johnson',
       age: 22,
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-      bio: 'CS Student & Coffee Enthusiast. Looking to connect!'
+      bio: 'CS Student & Coffee Enthusiast'
     });
   }
   return user;
 }
 
-/**
- * Get feed of profiles that the current user has not yet swiped on.
- * PRIVACY GUARANTEE: Never exposes inbound likes or internal flags.
- */
 async function getFeed(userId) {
-  // 1. Fetch all profile IDs already swiped by this user
-  const swipedRecords = await Swipe.find({ userId }).select('profileId').lean();
-  const swipedProfileIds = swipedRecords.map((s) => s.profileId);
+  const swiped = await Swipe.find({ userId }).select('profileId').lean();
+  const swipedIds = swiped.map((s) => s.profileId);
 
-  // 2. Fetch profiles excluding swiped IDs
-  // Note: hasLikedDemoUser is schema-level select: false, so it is never returned.
-  const profiles = await Profile.find({
-    _id: { $nin: swipedProfileIds }
-  })
-    .select('_id name age photo bio cityOrCollege interests createdAt')
+  const profiles = await Profile.find({ _id: { $nin: swipedIds } })
+    .select('_id name age photo bio cityOrCollege interests')
     .sort({ createdAt: -1 })
     .lean();
 
-  return {
-    success: true,
-    count: profiles.length,
-    profiles
-  };
+  return { success: true, count: profiles.length, profiles };
 }
 
-/**
- * Record a swipe (LIKE or PASS).
- * If LIKE, checks for mutual like and creates a match.
- */
-async function recordSwipe({ userId, profileId, action }) {
-  // Validate action
-  const normalizedAction = String(action).toUpperCase();
-  if (!['LIKE', 'PASS'].includes(normalizedAction)) {
-    const error = new Error('Invalid swipe action. Must be LIKE or PASS.');
-    error.statusCode = 400;
-    throw error;
+async function recordSwipe(userId, profileId, action) {
+  const act = String(action).toUpperCase();
+  if (!['LIKE', 'PASS'].includes(act)) {
+    const err = new Error('Invalid action, must be LIKE or PASS');
+    err.status = 400;
+    throw err;
   }
 
-  // Validate ObjectId
   if (!mongoose.Types.ObjectId.isValid(profileId)) {
-    const error = new Error('Invalid profile ID format.');
-    error.statusCode = 400;
-    throw error;
+    const err = new Error('Invalid profile ID');
+    err.status = 400;
+    throw err;
   }
 
-  // Verify target profile exists
-  // We explicitly select +hasLikedDemoUser ONLY in this backend service for match verification.
-  const targetProfile = await Profile.findById(profileId).select('+hasLikedDemoUser');
-  if (!targetProfile) {
-    const error = new Error('Profile not found.');
-    error.statusCode = 404;
-    throw error;
+  const profile = await Profile.findById(profileId).select('+hasLikedDemoUser');
+  if (!profile) {
+    const err = new Error('Profile not found');
+    err.status = 404;
+    throw err;
   }
 
-  // Check for duplicate swipe
-  const existingSwipe = await Swipe.findOne({ userId, profileId });
-  if (existingSwipe) {
-    const error = new Error('You have already swiped on this profile.');
-    error.statusCode = 409;
-    throw error;
+  const exists = await Swipe.findOne({ userId, profileId });
+  if (exists) {
+    const err = new Error('Profile already swiped');
+    err.status = 409;
+    throw err;
   }
 
-  // Persist swipe
-  await Swipe.create({
-    userId,
-    profileId,
-    action: normalizedAction
-  });
+  await Swipe.create({ userId, profileId, action: act });
 
-  // If PASS, no match can occur
-  if (normalizedAction === 'PASS') {
-    return {
-      success: true,
-      matched: false
-    };
-  }
-
-  // If LIKE, check for mutual like
-  const isMutual = Boolean(targetProfile.hasLikedDemoUser);
-
-  if (isMutual) {
-    // Create match if not already existing
+  if (act === 'LIKE' && profile.hasLikedDemoUser) {
     const match = await Match.findOneAndUpdate(
       { userId, matchedProfileId: profileId },
       { userId, matchedProfileId: profileId },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true }
     );
 
     return {
@@ -117,64 +73,42 @@ async function recordSwipe({ userId, profileId, action }) {
       match: {
         id: match._id,
         profile: {
-          id: targetProfile._id,
-          name: targetProfile.name,
-          age: targetProfile.age,
-          photo: targetProfile.photo,
-          bio: targetProfile.bio,
-          cityOrCollege: targetProfile.cityOrCollege,
-          interests: targetProfile.interests
+          id: profile._id,
+          name: profile.name,
+          age: profile.age,
+          photo: profile.photo,
+          bio: profile.bio,
+          cityOrCollege: profile.cityOrCollege,
+          interests: profile.interests
         }
       }
     };
   }
 
-  // Unilateral like -> privacy maintained, no match created
-  return {
-    success: true,
-    matched: false
-  };
+  return { success: true, matched: false };
 }
 
-/**
- * Get all mutual matches for the current user.
- * PRIVACY GUARANTEE: Returns only confirmed mutual matches.
- */
 async function getMatches(userId) {
-  const matches = await Match.find({ userId })
-    .populate({
-      path: 'matchedProfileId',
-      select: '_id name age photo bio cityOrCollege interests'
-    })
+  const records = await Match.find({ userId })
+    .populate('matchedProfileId', '_id name age photo bio cityOrCollege interests')
     .sort({ createdAt: -1 })
     .lean();
 
-  // Filter out any populated matches where the profile may have been deleted
-  const validMatches = matches
-    .filter((m) => m.matchedProfileId)
-    .map((m) => ({
-      matchId: m._id,
-      matchedAt: m.createdAt,
-      profile: m.matchedProfileId
+  const matches = records
+    .filter((r) => r.matchedProfileId)
+    .map((r) => ({
+      matchId: r._id,
+      matchedAt: r.createdAt,
+      profile: r.matchedProfileId
     }));
 
-  return {
-    success: true,
-    count: validMatches.length,
-    matches: validMatches
-  };
+  return { success: true, count: matches.length, matches };
 }
 
-/**
- * Reset demo swipes & matches (convenience utility for reviewers & testing).
- */
-async function resetDemoData(userId) {
+async function resetDemo(userId) {
   await Swipe.deleteMany({ userId });
   await Match.deleteMany({ userId });
-  return {
-    success: true,
-    message: 'Demo swipes and matches reset successfully.'
-  };
+  return { success: true, message: 'Reset successful' };
 }
 
 module.exports = {
@@ -182,5 +116,5 @@ module.exports = {
   getFeed,
   recordSwipe,
   getMatches,
-  resetDemoData
+  resetDemo
 };

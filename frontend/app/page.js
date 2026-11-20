@@ -9,15 +9,14 @@ import MatchModal from '../components/MatchModal';
 import { api } from '../lib/api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('discover');
-  const [demoUser, setDemoUser] = useState(null);
-  const [matchCount, setMatchCount] = useState(0);
+  const [tab, setTab] = useState('discover');
+  const [user, setUser] = useState(null);
+  const [matchesCount, setMatchesCount] = useState(0);
   const [currentMatch, setCurrentMatch] = useState(null);
   const [isResetting, setIsResetting] = useState(false);
   const [feedKey, setFeedKey] = useState(0);
 
-  // Fetch logged in demo user and match count
-  const refreshUserData = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
       const [meRes, matchesRes] = await Promise.allSettled([
         api.getMe(),
@@ -25,87 +24,76 @@ export default function App() {
       ]);
 
       if (meRes.status === 'fulfilled' && meRes.value.user) {
-        setDemoUser(meRes.value.user);
+        setUser(meRes.value.user);
       }
       if (matchesRes.status === 'fulfilled' && matchesRes.value.matches) {
-        setMatchCount(matchesRes.value.matches.length);
+        setMatchesCount(matchesRes.value.matches.length);
       }
     } catch (err) {
-      console.warn('Initial data load warning:', err.message);
+      console.warn('Data load error:', err.message);
     }
   }, []);
 
   useEffect(() => {
-    refreshUserData();
-  }, [refreshUserData]);
+    loadData();
+  }, [loadData]);
 
-  // Handle mutual match triggered from Discover tab
-  const handleMatchOccurred = useCallback((matchData) => {
+  const onMatch = useCallback((matchData) => {
     setCurrentMatch(matchData);
-    setMatchCount((prev) => prev + 1);
+    setMatchesCount((c) => c + 1);
   }, []);
 
-  // Handle demo reset
-  const handleResetDemo = useCallback(async () => {
+  const onReset = useCallback(async () => {
     setIsResetting(true);
     try {
       await api.resetDemo();
-      setMatchCount(0);
+      setMatchesCount(0);
       setFeedKey((k) => k + 1);
-      await refreshUserData();
+      await loadData();
     } catch (err) {
       console.error('Reset error:', err);
     } finally {
       setIsResetting(false);
     }
-  }, [refreshUserData]);
+  }, [loadData]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Top Navbar & Bottom Navigation */}
       <Navbar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        matchCount={matchCount}
-        onResetDemo={handleResetDemo}
+        tab={tab}
+        setTab={setTab}
+        matchesCount={matchesCount}
+        onReset={onReset}
         isResetting={isResetting}
       />
 
-      {/* Main Content Area */}
       <main className="flex-1 max-w-md w-full mx-auto">
-        {activeTab === 'home' && (
-          <HomeTab
-            onGoToDiscover={() => setActiveTab('discover')}
-            demoUser={demoUser}
-          />
+        {tab === 'home' && (
+          <HomeTab onDiscover={() => setTab('discover')} user={user} />
         )}
 
-        {activeTab === 'discover' && (
+        {tab === 'discover' && (
           <DiscoverTab
             key={feedKey}
-            onMatchOccurred={handleMatchOccurred}
-            onResetDemo={handleResetDemo}
+            onMatch={onMatch}
+            onReset={onReset}
             isResetting={isResetting}
-            onViewMatches={() => setActiveTab('matches')}
           />
         )}
 
-        {activeTab === 'matches' && (
-          <MatchesTab
-            onGoToDiscover={() => setActiveTab('discover')}
-          />
+        {tab === 'matches' && (
+          <MatchesTab onDiscover={() => setTab('discover')} />
         )}
       </main>
 
-      {/* Mutual Match Celebration Modal */}
       {currentMatch && (
         <MatchModal
-          matchData={currentMatch}
-          demoUser={demoUser}
+          match={currentMatch}
+          user={user}
           onClose={() => setCurrentMatch(null)}
           onViewMatches={() => {
             setCurrentMatch(null);
-            setActiveTab('matches');
+            setTab('matches');
           }}
         />
       )}

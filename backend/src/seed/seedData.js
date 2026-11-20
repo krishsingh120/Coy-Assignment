@@ -1,10 +1,4 @@
-/**
- * Curated seed data of 32 realistic mock profiles.
- * Designed to feel like a real college / young-adult dating community.
- * Approx 10 profiles have `hasLikedDemoUser: true` to trigger natural mutual matches.
- */
-
-const mockProfiles = [
+const profiles = [
   {
     name: 'Maya Lin',
     age: 21,
@@ -295,4 +289,4 @@ const mockProfiles = [
   }
 ];
 
-module.exports = { mockProfiles };
+module.exports = { profiles };

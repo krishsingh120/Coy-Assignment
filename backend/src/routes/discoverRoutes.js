@@ -1,18 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const discoverController = require('../controllers/discoverController');
-const { attachDemoUser } = require('../middleware/userMiddleware');
+const ctrl = require('../controllers/discoverController');
+const { authUser } = require('../middleware/userMiddleware');
 
-// Attach demo user to all discover endpoints
-router.use(attachDemoUser);
+router.use(authUser);
 
-// Core assignment endpoints
-router.get('/feed', discoverController.getFeed);
-router.post('/swipe', discoverController.recordSwipe);
-router.get('/matches', discoverController.getMatches);
-
-// Helper endpoints for demo user profile and replay demo
-router.get('/me', discoverController.getMe);
-router.post('/reset', discoverController.resetDemo);
+router.get('/feed', ctrl.getFeed);
+router.post('/swipe', ctrl.swipe);
+router.get('/matches', ctrl.getMatches);
+router.get('/me', ctrl.getMe);
+router.post('/reset', ctrl.reset);
 
 module.exports = router;
